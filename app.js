@@ -18,6 +18,10 @@ let _db = null;
 let _docRef = null;
 let _applyingRemote = false;
 let _saveTimer = null;
+// True once we've heard back from Firestore at least once. Until then, we
+// don't push local edits up — protects against the phone overwriting
+// correct cloud data with stale localStorage on first load.
+let _hasReceivedRemote = false;
 
 function setSyncBadge(s, label) {
   const el = document.getElementById('syncBadge');
@@ -51,11 +55,14 @@ function initFirebase() {
               localStorage.setItem(STORAGE_KEY, remote.payload);
               renderAll();
               _applyingRemote = false;
+              _hasReceivedRemote = true;
               setSyncBadge('synced', 'Synced');
             } catch (e) { console.warn('Bad remote payload', e); }
           }
         } else {
-          // First run — push local state up
+          // First run — there's nothing in Firestore yet, so seed it with
+          // local state. Marking as received because we're now authoritative.
+          _hasReceivedRemote = true;
           pushToCloud(true);
         }
       },
@@ -72,6 +79,13 @@ function initFirebase() {
 
 function pushToCloud(initial) {
   if (!_docRef) return;
+  // Don't push local edits until we've received Firestore's data at least
+  // once. Otherwise stale localStorage on a fresh device could overwrite
+  // correct cloud state.
+  if (!initial && !_hasReceivedRemote) {
+    setSyncBadge('connecting', 'Connecting…');
+    return;
+  }
   if (!initial) setSyncBadge('syncing', 'Saving…');
   const payload = JSON.stringify(state);
   _docRef.set({
@@ -83,6 +97,16 @@ function pushToCloud(initial) {
     console.warn('Cloud save failed:', err);
     setSyncBadge('offline', 'Offline');
   });
+}
+
+// Flush any pending debounced write immediately. Called when the tab is
+// being hidden or unloaded so a typed edit can't be left behind.
+function flushPendingWrite() {
+  if (_saveTimer && _hasReceivedRemote) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+    pushToCloud(false);
+  }
 }
 
 const seedData = {
@@ -997,6 +1021,14 @@ function wireEvents() {
       if (series.length > 0) drawChart($('chart'), series);
     }, 120);
   });
+
+  // Flush pending Firebase writes when the page is being hidden or closed.
+  // Mobile browsers fire visibilitychange more reliably than beforeunload.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingWrite();
+  });
+  window.addEventListener('pagehide', flushPendingWrite);
+  window.addEventListener('beforeunload', flushPendingWrite);
   $('acctSaveBtn').addEventListener('click', saveAccount);
   $('acctDeleteBtn').addEventListener('click', deleteAccount);
   $('memberSaveBtn').addEventListener('click', saveMember);
