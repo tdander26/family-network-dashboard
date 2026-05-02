@@ -727,7 +727,15 @@ function renderHistory() {
 }
 
 function drawChart(svg, series) {
-  const W = 800, H = 280;
+  // Use the chart wrapper's real dimensions so the SVG renders 1:1
+  // without preserveAspectRatio stretching dots/lines.
+  const wrap = svg.parentElement;
+  const rect = wrap.getBoundingClientRect();
+  const W = Math.max(320, Math.round(rect.width));
+  const H = Math.max(220, Math.round(rect.height));
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
   const padL = 60, padR = 20, padT = 20, padB = 36;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
@@ -810,7 +818,6 @@ function drawChart(svg, series) {
   `;
 
   // Tooltip
-  const wrap = $('chartWrap');
   let tt = wrap.querySelector('.chart-tooltip');
   if (!tt) {
     tt = document.createElement('div');
@@ -946,6 +953,16 @@ function wireEvents() {
   $('addAccountBtn').addEventListener('click', () => openAccountModal(null));
   $('addMemberBtn').addEventListener('click', openMemberModal);
   $('saveSnapshotBtn').addEventListener('click', saveSnapshot);
+
+  // Redraw chart on resize
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const series = activeHistorySeries();
+      if (series.length > 0) drawChart($('chart'), series);
+    }, 120);
+  });
   $('acctSaveBtn').addEventListener('click', saveAccount);
   $('acctDeleteBtn').addEventListener('click', deleteAccount);
   $('memberSaveBtn').addEventListener('click', saveMember);
