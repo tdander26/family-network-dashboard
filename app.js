@@ -113,6 +113,7 @@ const seedData = {
     },
   ],
   activeMemberId: 'family',
+  history: [],
   familyGoal: { target: 0, monthly: 4500, rate: 7 },
   houseCalc: {
     expanded: true,
@@ -296,6 +297,79 @@ function activeTotal() {
 
 function activeLabel() {
   return isFamilyView() ? 'Family' : activeMember().name;
+}
+
+// ===== History / snapshots =====
+function ensureHistory() {
+  if (!Array.isArray(state.history)) state.history = [];
+  return state.history;
+}
+
+function currentMonthKey(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+function formatMonthLabel(monthKey) {
+  // "2026-05" -> "May 2026"
+  const [y, m] = monthKey.split('-').map(Number);
+  const d = new Date(y, m - 1, 1);
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function buildSnapshot() {
+  const perMember = {};
+  state.members.forEach(mem => { perMember[mem.id] = memberTotal(mem); });
+  return {
+    id: 's' + Date.now().toString(36),
+    month: currentMonthKey(),
+    capturedAt: new Date().toISOString(),
+    perMember,
+    total: familyTotal(),
+  };
+}
+
+function saveSnapshot() {
+  const hist = ensureHistory();
+  const snap = buildSnapshot();
+  // If a snapshot exists for this month, replace it
+  const existingIdx = hist.findIndex(s => s.month === snap.month);
+  if (existingIdx >= 0) {
+    hist[existingIdx] = { ...hist[existingIdx], ...snap, id: hist[existingIdx].id };
+  } else {
+    hist.push(snap);
+  }
+  hist.sort((a, b) => a.month.localeCompare(b.month));
+  saveState();
+  renderHistory();
+  flashSnapshotButton();
+}
+
+function deleteSnapshot(id) {
+  state.history = (state.history || []).filter(s => s.id !== id);
+  saveState();
+  renderHistory();
+}
+
+function flashSnapshotButton() {
+  const btn = $('saveSnapshotBtn');
+  if (!btn) return;
+  const orig = btn.textContent;
+  btn.textContent = '✓ Saved';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1400);
+}
+
+// Returns sorted [{ month, label, value }] for the active view
+function activeHistorySeries() {
+  const hist = ensureHistory();
+  return hist.map(s => {
+    const value = isFamilyView()
+      ? (s.total != null ? s.total : Object.values(s.perMember || {}).reduce((a, b) => a + b, 0))
+      : (s.perMember && s.perMember[state.activeMemberId]) || 0;
+    return { month: s.month, label: formatMonthLabel(s.month), value, snapshot: s };
+  });
 }
 
 // ===== Rendering =====
@@ -601,6 +675,168 @@ function renderAll() {
   renderHero();
   renderAccounts();
   renderGoal();
+  renderHistory();
+}
+
+// ===== Chart rendering =====
+function renderHistory() {
+  const series = activeHistorySeries();
+  const sub = $('historySub');
+  const empty = $('chartEmpty');
+  const svg = $('chart');
+  const list = $('snapshotsList');
+
+  if (series.length === 0) {
+    sub.textContent = 'No snapshots yet';
+    empty.style.display = '';
+    svg.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+
+  sub.textContent = `${series.length} snapshot${series.length === 1 ? '' : 's'} · ${activeLabel()}`;
+  empty.style.display = 'none';
+  svg.style.display = '';
+
+  // Render SVG line chart
+  drawChart(svg, series);
+
+  // Snapshot list
+  list.innerHTML = '';
+  const reversed = [...series].reverse();
+  reversed.forEach((pt, i) => {
+    const prev = reversed[i + 1];
+    const delta = prev ? pt.value - prev.value : null;
+    const row = document.createElement('div');
+    row.className = 'snapshot-row';
+    const deltaCls = delta == null ? '' : (delta >= 0 ? 'up' : 'down');
+    const deltaText = delta == null
+      ? '—'
+      : (delta >= 0 ? '+' : '−') + fmtMoney(Math.abs(delta));
+    row.innerHTML = `
+      <div class="snapshot-date">${pt.label}</div>
+      <div class="snapshot-delta ${deltaCls}">${deltaText}</div>
+      <div class="snapshot-total">${fmtMoney(pt.value)}</div>
+      <button class="snapshot-del" title="Delete">×</button>
+    `;
+    row.querySelector('.snapshot-del').addEventListener('click', () => {
+      if (confirm(`Delete the ${pt.label} snapshot?`)) deleteSnapshot(pt.snapshot.id);
+    });
+    list.appendChild(row);
+  });
+}
+
+function drawChart(svg, series) {
+  const W = 800, H = 280;
+  const padL = 60, padR = 20, padT = 20, padB = 36;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+
+  const values = series.map(p => p.value);
+  let yMin = Math.min(...values, 0);
+  let yMax = Math.max(...values);
+  if (yMax === yMin) { yMax = yMin + 1000; }
+  // Pad y a bit
+  const yPad = (yMax - yMin) * 0.15;
+  yMax = yMax + yPad;
+  yMin = Math.max(0, yMin - yPad);
+
+  const xFor = i => series.length === 1
+    ? padL + innerW / 2
+    : padL + (i / (series.length - 1)) * innerW;
+  const yFor = v => padT + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
+
+  // Build path
+  let path = '';
+  let area = '';
+  series.forEach((pt, i) => {
+    const x = xFor(i);
+    const y = yFor(pt.value);
+    path += (i === 0 ? `M${x},${y}` : ` L${x},${y}`);
+  });
+  if (series.length === 1) {
+    // Single point: small horizontal line
+    const x = xFor(0); const y = yFor(series[0].value);
+    path = `M${x - 8},${y} L${x + 8},${y}`;
+    area = `M${x - 8},${y} L${x + 8},${y} L${x + 8},${padT + innerH} L${x - 8},${padT + innerH} Z`;
+  } else {
+    area = path + ` L${xFor(series.length - 1)},${padT + innerH} L${xFor(0)},${padT + innerH} Z`;
+  }
+
+  // Y-axis ticks (4)
+  const ticks = 4;
+  const yTickLines = [];
+  const yTickLabels = [];
+  for (let i = 0; i <= ticks; i++) {
+    const v = yMin + (yMax - yMin) * (i / ticks);
+    const y = yFor(v);
+    yTickLines.push(`<line class="chart-grid" x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" />`);
+    yTickLabels.push(`<text class="chart-axis" x="${padL - 8}" y="${y + 4}" text-anchor="end">${fmtAxisCurrency(v)}</text>`);
+  }
+
+  // X-axis labels (sample)
+  const xLabels = [];
+  const labelEvery = Math.max(1, Math.ceil(series.length / 6));
+  series.forEach((pt, i) => {
+    if (i % labelEvery !== 0 && i !== series.length - 1) return;
+    const x = xFor(i);
+    xLabels.push(`<text class="chart-axis" x="${x}" y="${H - 14}" text-anchor="middle">${pt.label}</text>`);
+  });
+
+  // Dots
+  const dots = series.map((pt, i) => {
+    const x = xFor(i);
+    const y = yFor(pt.value);
+    return `<circle class="chart-dot" cx="${x}" cy="${y}" r="4" data-idx="${i}" />`;
+  }).join('');
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#a3854e"/>
+        <stop offset="100%" stop-color="#d4b573"/>
+      </linearGradient>
+      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#d4b573" stop-opacity="0.45"/>
+        <stop offset="100%" stop-color="#d4b573" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    ${yTickLines.join('')}
+    <path class="chart-area-fill" d="${area}" />
+    <path class="chart-line" d="${path}" />
+    ${dots}
+    ${yTickLabels.join('')}
+    ${xLabels.join('')}
+  `;
+
+  // Tooltip
+  const wrap = $('chartWrap');
+  let tt = wrap.querySelector('.chart-tooltip');
+  if (!tt) {
+    tt = document.createElement('div');
+    tt.className = 'chart-tooltip';
+    wrap.appendChild(tt);
+  }
+  svg.querySelectorAll('.chart-dot').forEach(dot => {
+    dot.addEventListener('mouseenter', e => {
+      const idx = parseInt(dot.getAttribute('data-idx'), 10);
+      const pt = series[idx];
+      const rect = wrap.getBoundingClientRect();
+      const dotBox = dot.getBoundingClientRect();
+      tt.innerHTML = `<div class="tt-date">${pt.label}</div><div class="tt-val">${fmtMoney(pt.value)}</div>`;
+      tt.style.left = (dotBox.left - rect.left + dotBox.width / 2) + 'px';
+      tt.style.top = (dotBox.top - rect.top) + 'px';
+      tt.style.display = 'block';
+    });
+    dot.addEventListener('mouseleave', () => { tt.style.display = 'none'; });
+  });
+}
+
+function fmtAxisCurrency(n) {
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (abs >= 1000) return '$' + Math.round(n / 1000) + 'k';
+  return '$' + Math.round(n);
 }
 
 // ===== Account modal =====
@@ -709,6 +945,7 @@ function saveMember() {
 function wireEvents() {
   $('addAccountBtn').addEventListener('click', () => openAccountModal(null));
   $('addMemberBtn').addEventListener('click', openMemberModal);
+  $('saveSnapshotBtn').addEventListener('click', saveSnapshot);
   $('acctSaveBtn').addEventListener('click', saveAccount);
   $('acctDeleteBtn').addEventListener('click', deleteAccount);
   $('memberSaveBtn').addEventListener('click', saveMember);

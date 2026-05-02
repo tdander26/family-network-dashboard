@@ -27,6 +27,7 @@
     </div>
     <nav class="member-tabs" id="memberTabs"></nav>
     <div class="topbar-actions">
+      <button class="ghost-btn primary-accent" id="saveSnapshotBtn" title="Save current balances to history">Save Snapshot</button>
       <button class="ghost-btn" id="addAccountBtn" title="Add account">+ Account</button>
       <button class="ghost-btn" id="addMemberBtn" title="Add family member">+ Member</button>
     </div>
@@ -203,6 +204,20 @@
           </div>
           <div class="progress-meta" id="progressMeta">0% of goal</div>
         </div>
+      </div>
+    </section>
+
+    <section class="history-section">
+      <div class="panel history-panel">
+        <div class="panel-head">
+          <h2>History</h2>
+          <div class="panel-sub" id="historySub">No snapshots yet</div>
+        </div>
+        <div class="chart-wrap" id="chartWrap">
+          <div class="chart-empty" id="chartEmpty">Click <strong>Save Snapshot</strong> to record this month's balances. Your trend will appear here.</div>
+          <svg class="chart" id="chart" viewBox="0 0 800 280" preserveAspectRatio="none" style="display:none"></svg>
+        </div>
+        <div class="snapshots-list" id="snapshotsList"></div>
       </div>
     </section>
   </main>
