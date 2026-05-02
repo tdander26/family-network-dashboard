@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Anderson Family · Net Worth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="ambient"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">A</div>
+      <div class="brand-text">
+        <div class="brand-name">Anderson Family</div>
+        <div class="brand-sub">Private Wealth Overview</div>
+      </div>
+    </div>
+    <nav class="member-tabs" id="memberTabs"></nav>
+    <div class="topbar-actions">
+      <button class="ghost-btn" id="addAccountBtn" title="Add account">+ Account</button>
+      <button class="ghost-btn" id="addMemberBtn" title="Add family member">+ Member</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-label">Total Net Worth</div>
+      <div class="hero-value" id="totalValue">$0</div>
+      <div class="hero-meta" id="totalMeta">Across <span id="accountCount">0</span> accounts</div>
+    </section>
+
+    <section class="grid">
+      <div class="panel accounts-panel">
+        <div class="panel-head">
+          <h2>Accounts</h2>
+          <div class="panel-sub" id="memberLabel">—</div>
+        </div>
+        <div class="accounts" id="accountsList"></div>
+      </div>
+
+      <div class="panel goal-panel">
+        <div class="panel-head">
+          <h2>Goal Planner</h2>
+          <div class="panel-sub">Project your path to the target</div>
+        </div>
+
+        <div class="goal-form">
+          <label>
+            <span>Target Amount</span>
+            <div class="input-wrap">
+              <span class="prefix">$</span>
+              <input type="text" id="goalAmount" inputmode="decimal" placeholder="250,000" />
+            </div>
+          </label>
+
+          <label>
+            <span>Monthly Contribution</span>
+            <div class="input-wrap">
+              <span class="prefix">$</span>
+              <input type="text" id="monthlyAmount" inputmode="decimal" placeholder="2,000" />
+            </div>
+          </label>
+
+          <label>
+            <span>Expected Annual Return</span>
+            <div class="input-wrap">
+              <input type="text" id="returnRate" inputmode="decimal" placeholder="7" />
+              <span class="suffix">%</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="goal-results" id="goalResults">
+          <div class="result-row">
+            <div class="result-label">Current</div>
+            <div class="result-value" id="resCurrent">$0</div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Remaining</div>
+            <div class="result-value" id="resRemaining">$0</div>
+          </div>
+          <div class="result-row highlight">
+            <div class="result-label">Time to Goal</div>
+            <div class="result-value" id="resTime">—</div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Projected Date</div>
+            <div class="result-value" id="resDate">—</div>
+          </div>
+          <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="progress-meta" id="progressMeta">0% of goal</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Account modal -->
+  <div class="modal-overlay" id="accountModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="accountModalTitle">Add Account</h3>
+        <button class="close-btn" data-close>&times;</button>
+      </div>
+      <div class="modal-body">
+        <label>
+          <span>Account Name</span>
+          <input type="text" id="acctName" placeholder="Chase Checking" />
+        </label>
+        <label>
+          <span>Balance</span>
+          <div class="input-wrap">
+            <span class="prefix">$</span>
+            <input type="text" id="acctBalance" inputmode="decimal" placeholder="0.00" />
+          </div>
+        </label>
+        <label>
+          <span>Category</span>
+          <select id="acctCategory">
+            <option value="cash">Cash & Banking</option>
+            <option value="retirement">Retirement</option>
+            <option value="investment">Investment</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="ghost-btn danger" id="acctDeleteBtn" style="display:none">Delete</button>
+        <div class="spacer"></div>
+        <button class="ghost-btn" data-close>Cancel</button>
+        <button class="primary-btn" id="acctSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Member modal -->
+  <div class="modal-overlay" id="memberModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Add Family Member</h3>
+        <button class="close-btn" data-close>&times;</button>
+      </div>
+      <div class="modal-body">
+        <label>
+          <span>Name</span>
+          <input type="text" id="memberName" placeholder="Morgan" />
+        </label>
+      </div>
+      <div class="modal-foot">
+        <div class="spacer"></div>
+        <button class="ghost-btn" data-close>Cancel</button>
+        <button class="primary-btn" id="memberSaveBtn">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
