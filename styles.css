@@ -143,6 +143,15 @@ body { overflow-x: hidden; }
   background: rgba(200, 169, 106, 0.08);
   border-color: rgba(200, 169, 106, 0.3);
 }
+.member-tab.family-tab {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+}
+.member-tab.family-tab.active {
+  background: linear-gradient(135deg, rgba(212, 181, 115, 0.18), rgba(163, 133, 78, 0.12));
+  border-color: rgba(212, 181, 115, 0.45);
+}
 
 .topbar-actions { display: flex; gap: 8px; }
 
@@ -352,10 +361,10 @@ label > span {
   font-size: 14px;
   pointer-events: none;
 }
-.input-wrap .prefix { left: 14px; }
-.input-wrap .suffix { right: 14px; }
-.input-wrap input { padding-left: 26px; }
-.input-wrap:has(.suffix) input { padding-right: 26px; }
+.input-wrap .prefix { left: 16px; }
+.input-wrap .suffix { right: 16px; }
+.input-wrap input[type="text"] { padding-left: 30px; }
+.input-wrap:has(.suffix) input[type="text"] { padding-right: 30px; }
 
 input[type="text"], select {
   width: 100%;

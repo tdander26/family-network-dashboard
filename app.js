@@ -112,8 +112,11 @@ const seedData = {
       ],
     },
   ],
-  activeMemberId: 'todd',
+  activeMemberId: 'family',
+  familyGoal: { target: 1000000, monthly: 4500, rate: 7 },
 };
+
+const FAMILY_ID = 'family';
 
 let state = loadState();
 
@@ -168,7 +171,12 @@ const categoryGlyph = (c, name) => {
 };
 
 // ===== State helpers =====
+function isFamilyView() {
+  return state.activeMemberId === FAMILY_ID;
+}
+
 function activeMember() {
+  if (isFamilyView()) return null;
   return state.members.find(m => m.id === state.activeMemberId) || state.members[0];
 }
 
@@ -176,29 +184,70 @@ function memberTotal(m) {
   return (m.accounts || []).reduce((s, a) => s + (Number(a.balance) || 0), 0);
 }
 
+function familyTotal() {
+  return state.members.reduce((s, m) => s + memberTotal(m), 0);
+}
+
+function familyAccountCount() {
+  return state.members.reduce((s, m) => s + (m.accounts?.length || 0), 0);
+}
+
+// Returns array of { account, member } pairs for the family view
+function familyAccounts() {
+  const list = [];
+  state.members.forEach(m => {
+    (m.accounts || []).forEach(acc => list.push({ account: acc, member: m }));
+  });
+  return list;
+}
+
+function activeGoal() {
+  if (isFamilyView()) {
+    state.familyGoal = state.familyGoal || { target: 0, monthly: 0, rate: 7 };
+    return state.familyGoal;
+  }
+  const m = activeMember();
+  m.goal = m.goal || { target: 0, monthly: 0, rate: 7 };
+  return m.goal;
+}
+
+function activeTotal() {
+  return isFamilyView() ? familyTotal() : memberTotal(activeMember());
+}
+
+function activeLabel() {
+  return isFamilyView() ? 'Family' : activeMember().name;
+}
+
 // ===== Rendering =====
 function renderMemberTabs() {
   const tabs = $('memberTabs');
   tabs.innerHTML = '';
-  state.members.forEach(m => {
+
+  const makeTab = (id, label) => {
     const btn = document.createElement('button');
-    btn.className = 'member-tab' + (m.id === state.activeMemberId ? ' active' : '');
-    btn.textContent = m.name;
+    btn.className = 'member-tab' + (id === state.activeMemberId ? ' active' : '');
+    btn.textContent = label;
     btn.addEventListener('click', () => {
-      state.activeMemberId = m.id;
+      state.activeMemberId = id;
       saveState();
       renderAll();
     });
-    tabs.appendChild(btn);
-  });
+    return btn;
+  };
+
+  const familyTab = makeTab(FAMILY_ID, 'Family');
+  familyTab.classList.add('family-tab');
+  tabs.appendChild(familyTab);
+
+  state.members.forEach(m => tabs.appendChild(makeTab(m.id, m.name)));
 }
 
 function renderHero() {
-  const m = activeMember();
-  const total = memberTotal(m);
+  const total = activeTotal();
   animateNumber($('totalValue'), total);
-  $('accountCount').textContent = (m.accounts || []).length;
-  $('memberLabel').textContent = m.name;
+  $('accountCount').textContent = isFamilyView() ? familyAccountCount() : (activeMember().accounts || []).length;
+  $('memberLabel').textContent = activeLabel();
 }
 
 let heroAnimToken = 0;
@@ -221,35 +270,49 @@ function animateNumber(el, target) {
 }
 
 function renderAccounts() {
-  const m = activeMember();
   const list = $('accountsList');
   list.innerHTML = '';
-  if (!m.accounts || m.accounts.length === 0) {
-    list.innerHTML = '<div class="empty-state">No accounts yet. Click <strong>+ Account</strong> to add one.</div>';
-    return;
+
+  let entries;
+  if (isFamilyView()) {
+    entries = familyAccounts();
+    if (entries.length === 0) {
+      list.innerHTML = '<div class="empty-state">No accounts yet. Pick a member tab and click <strong>+ Account</strong>.</div>';
+      return;
+    }
+    entries.sort((a, b) => b.account.balance - a.account.balance);
+  } else {
+    const m = activeMember();
+    if (!m.accounts || m.accounts.length === 0) {
+      list.innerHTML = '<div class="empty-state">No accounts yet. Click <strong>+ Account</strong> to add one.</div>';
+      return;
+    }
+    entries = [...m.accounts].sort((a, b) => b.balance - a.balance).map(a => ({ account: a, member: m }));
   }
-  // Sort: largest balance first
-  const sorted = [...m.accounts].sort((a, b) => b.balance - a.balance);
-  sorted.forEach(acc => {
+
+  entries.forEach(({ account: acc, member }) => {
     const row = document.createElement('div');
     row.className = 'account-row';
+    const subText = isFamilyView()
+      ? `${member.name} · ${categoryLabel(acc.category)}`
+      : categoryLabel(acc.category);
     row.innerHTML = `
       <div class="account-icon ${acc.category || 'other'}">${categoryGlyph(acc.category, acc.name)}</div>
       <div>
         <div class="account-name"></div>
-        <div class="account-cat">${categoryLabel(acc.category)}</div>
+        <div class="account-cat"></div>
       </div>
       <div class="account-balance">${fmtMoney(acc.balance)}</div>
     `;
     row.querySelector('.account-name').textContent = acc.name;
-    row.addEventListener('click', () => openAccountModal(acc.id));
+    row.querySelector('.account-cat').textContent = subText;
+    row.addEventListener('click', () => openAccountModal(acc.id, member.id));
     list.appendChild(row);
   });
 }
 
 function renderGoal() {
-  const m = activeMember();
-  const goal = m.goal || { target: 0, monthly: 0, rate: 7 };
+  const goal = activeGoal();
   $('goalAmount').value = goal.target ? Number(goal.target).toLocaleString('en-US') : '';
   $('monthlyAmount').value = goal.monthly ? Number(goal.monthly).toLocaleString('en-US') : '';
   $('returnRate').value = goal.rate || '';
@@ -257,8 +320,7 @@ function renderGoal() {
 }
 
 function computeGoal() {
-  const m = activeMember();
-  const current = memberTotal(m);
+  const current = activeTotal();
   const target = parseNum($('goalAmount').value);
   const monthly = parseNum($('monthlyAmount').value);
   const annualRate = parseNum($('returnRate').value);
@@ -268,7 +330,11 @@ function computeGoal() {
   $('resRemaining').textContent = fmtMoney(remaining);
 
   // Save goal inputs
-  m.goal = { target, monthly, rate: annualRate };
+  if (isFamilyView()) {
+    state.familyGoal = { target, monthly, rate: annualRate };
+  } else {
+    activeMember().goal = { target, monthly, rate: annualRate };
+  }
   saveState();
 
   // Compute time to goal: future value formula
@@ -345,12 +411,35 @@ function renderAll() {
 
 // ===== Account modal =====
 let editingAccountId = null;
+let editingMemberId = null;
 
-function openAccountModal(id) {
-  editingAccountId = id || null;
-  const m = activeMember();
-  const acc = id ? m.accounts.find(a => a.id === id) : null;
-  $('accountModalTitle').textContent = acc ? 'Edit Account' : 'Add Account';
+function openAccountModal(accountId, memberId) {
+  // memberId override is used for editing from Family view
+  let targetMemberId = memberId || (isFamilyView() ? null : state.activeMemberId);
+
+  // Adding a new account from Family view: ask which member
+  if (!accountId && !targetMemberId) {
+    if (state.members.length === 1) {
+      targetMemberId = state.members[0].id;
+    } else {
+      const choice = window.prompt(
+        'Add account to which family member?\n\n' +
+        state.members.map((m, i) => `${i + 1}. ${m.name}`).join('\n'),
+        '1'
+      );
+      if (!choice) return;
+      const idx = parseInt(choice, 10) - 1;
+      if (isNaN(idx) || idx < 0 || idx >= state.members.length) return;
+      targetMemberId = state.members[idx].id;
+    }
+  }
+
+  editingAccountId = accountId || null;
+  editingMemberId = targetMemberId;
+
+  const m = state.members.find(x => x.id === targetMemberId);
+  const acc = accountId ? (m.accounts || []).find(a => a.id === accountId) : null;
+  $('accountModalTitle').textContent = (acc ? 'Edit Account' : 'Add Account') + ` · ${m.name}`;
   $('acctName').value = acc ? acc.name : '';
   $('acctBalance').value = acc ? Number(acc.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
   $('acctCategory').value = acc ? (acc.category || 'other') : 'cash';
@@ -362,10 +451,12 @@ function openAccountModal(id) {
 function closeAccountModal() {
   $('accountModal').classList.remove('open');
   editingAccountId = null;
+  editingMemberId = null;
 }
 
 function saveAccount() {
-  const m = activeMember();
+  const m = state.members.find(x => x.id === editingMemberId);
+  if (!m) return;
   const name = $('acctName').value.trim();
   const balance = parseNum($('acctBalance').value);
   const category = $('acctCategory').value;
@@ -385,7 +476,8 @@ function saveAccount() {
 
 function deleteAccount() {
   if (!editingAccountId) return;
-  const m = activeMember();
+  const m = state.members.find(x => x.id === editingMemberId);
+  if (!m) return;
   m.accounts = (m.accounts || []).filter(a => a.id !== editingAccountId);
   saveState();
   closeAccountModal();
