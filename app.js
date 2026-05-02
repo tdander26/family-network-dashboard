@@ -1,9 +1,103 @@
 // ===== Family Network Dashboard =====
 
-const STORAGE_KEY = 'family-network-dashboard-v1';
+const STORAGE_KEY = 'family-network-dashboard-v2';
+
+// ===== Firebase (cloud sync) =====
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBq77puuoon1uTmEVOFhHP9x-sixa7PD5o",
+  authDomain:        "profit-first-dashboard.firebaseapp.com",
+  projectId:         "profit-first-dashboard",
+  storageBucket:     "profit-first-dashboard.firebasestorage.app",
+  messagingSenderId: "457012175633",
+  appId:             "1:457012175633:web:1ca50f59e38346e6ade2b0"
+};
+const FS_COLLECTION = 'dashboard';
+const FS_DOC = 'family-net-worth-anderson';
+
+let _db = null;
+let _docRef = null;
+let _applyingRemote = false;
+let _saveTimer = null;
+
+function setSyncBadge(s, label) {
+  const el = document.getElementById('syncBadge');
+  if (!el) return;
+  el.classList.remove('connecting','synced','syncing','offline');
+  el.classList.add(s);
+  el.querySelector('.sync-text').textContent = label;
+}
+
+function initFirebase() {
+  try {
+    if (typeof firebase === 'undefined') {
+      setSyncBadge('offline', 'Local only');
+      return;
+    }
+    firebase.initializeApp(FIREBASE_CONFIG);
+    _db = firebase.firestore();
+    _db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    _docRef = _db.collection(FS_COLLECTION).doc(FS_DOC);
+    setSyncBadge('connecting', 'Connecting…');
+
+    _docRef.onSnapshot(
+      (snap) => {
+        if (snap.exists) {
+          const remote = snap.data();
+          if (remote && remote.payload) {
+            try {
+              const next = JSON.parse(remote.payload);
+              _applyingRemote = true;
+              state = next;
+              localStorage.setItem(STORAGE_KEY, remote.payload);
+              renderAll();
+              _applyingRemote = false;
+              setSyncBadge('synced', 'Synced');
+            } catch (e) { console.warn('Bad remote payload', e); }
+          }
+        } else {
+          // First run — push local state up
+          pushToCloud(true);
+        }
+      },
+      (err) => {
+        console.warn('Snapshot error:', err);
+        setSyncBadge('offline', 'Offline');
+      }
+    );
+  } catch (e) {
+    console.warn('Firebase init failed:', e);
+    setSyncBadge('offline', 'Local only');
+  }
+}
+
+function pushToCloud(initial) {
+  if (!_docRef) return;
+  if (!initial) setSyncBadge('syncing', 'Saving…');
+  const payload = JSON.stringify(state);
+  _docRef.set({
+    payload,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }).then(() => {
+    setSyncBadge('synced', 'Synced');
+  }).catch((err) => {
+    console.warn('Cloud save failed:', err);
+    setSyncBadge('offline', 'Offline');
+  });
+}
 
 const seedData = {
   members: [
+    {
+      id: 'todd',
+      name: 'Todd',
+      goal: { target: 500000, monthly: 2500, rate: 7 },
+      accounts: [
+        { id: 't1', name: 'Chase Checking', balance: 4800,    category: 'cash' },
+        { id: 't2', name: 'Ally Savings',   balance: 2000,    category: 'cash' },
+        { id: 't3', name: 'Robinhood',      balance: 121310,  category: 'investment' },
+        { id: 't4', name: 'M1',             balance: 103000,  category: 'investment' },
+      ],
+    },
     {
       id: 'morgan',
       name: 'Morgan',
@@ -18,7 +112,7 @@ const seedData = {
       ],
     },
   ],
-  activeMemberId: 'morgan',
+  activeMemberId: 'todd',
 };
 
 let state = loadState();
@@ -33,6 +127,10 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (_applyingRemote) return;
+  // Debounce cloud writes (rapid input typing)
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => pushToCloud(false), 350);
 }
 
 const $ = (id) => document.getElementById(id);
@@ -396,3 +494,4 @@ function wireEvents() {
 // ===== Boot =====
 wireEvents();
 renderAll();
+initFirebase();

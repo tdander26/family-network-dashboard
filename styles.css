@@ -56,6 +56,38 @@ body { overflow-x: hidden; }
 
 .brand { display: flex; align-items: center; gap: 14px; }
 
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255,255,255,0.02);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  letter-spacing: 0.4px;
+  margin-left: 4px;
+}
+.sync-badge .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-mute);
+  box-shadow: 0 0 0 0 currentColor;
+}
+.sync-badge.connecting { color: #d4b573; }
+.sync-badge.connecting .dot { background: #d4b573; animation: pulse 1.4s ease-in-out infinite; }
+.sync-badge.synced { color: var(--green); }
+.sync-badge.synced .dot { background: var(--green); }
+.sync-badge.syncing { color: #d4b573; }
+.sync-badge.syncing .dot { background: #d4b573; animation: pulse 1.4s ease-in-out infinite; }
+.sync-badge.offline { color: var(--red); }
+.sync-badge.offline .dot { background: var(--red); }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 .mark {
   width: 40px; height: 40px;
   border-radius: 12px;
