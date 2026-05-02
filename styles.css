@@ -236,6 +236,58 @@ main {
   main { padding: 40px 20px 60px; }
 }
 
+/* True mobile — stack header in two rows */
+@media (max-width: 720px) {
+  .topbar {
+    padding: 14px 16px;
+    gap: 12px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "brand brand actions"
+      "tabs tabs tabs";
+    align-items: center;
+  }
+  .brand { grid-area: brand; gap: 10px; min-width: 0; }
+  .brand-text { min-width: 0; }
+  .brand-name { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brand-sub { display: none; }
+  .mark { width: 36px; height: 36px; font-size: 19px; border-radius: 10px; }
+
+  .sync-badge {
+    margin-left: auto;
+    padding: 4px 9px;
+    font-size: 10px;
+  }
+  .sync-badge .sync-text { display: none; }
+  .sync-badge .dot { margin: 0; }
+
+  .topbar-actions { grid-area: actions; gap: 6px; }
+  .topbar-actions .ghost-btn { padding: 7px 10px; font-size: 12px; }
+
+  .member-tabs {
+    grid-area: tabs;
+    margin-left: 0;
+    padding-bottom: 2px;
+    overflow-x: auto;
+  }
+  .member-tab { padding: 7px 14px; font-size: 12px; }
+
+  .hero { margin-bottom: 40px; }
+  .hero-value { font-size: clamp(44px, 14vw, 72px); }
+
+  .panel { padding: 20px 18px; border-radius: 14px; }
+  .panel-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .panel-head h2 { font-size: 19px; }
+
+  .grid { gap: 18px; }
+
+  .form-row { grid-template-columns: 1fr; }
+  .account-row { grid-template-columns: auto 1fr auto; padding: 14px 14px; gap: 12px; }
+  .account-balance { font-size: 17px; }
+  .account-name { font-size: 13px; }
+}
+
 .panel {
   background: linear-gradient(180deg, rgba(22, 27, 34, 0.7) 0%, rgba(15, 19, 24, 0.7) 100%);
   border: 1px solid var(--line);
