@@ -125,7 +125,8 @@ const seedData = {
     dtiPercent: 30,
     mortgageRate: 6.75,
     loanTermYears: 30,
-    taxesInsurance: 500,
+    propertyTaxRate: 1.15, // Hennepin County MN avg
+    annualInsurance: 1800,
     homePrice: 650000,
   },
 };
@@ -235,11 +236,15 @@ function ensureHouseCalc() {
       dtiPercent: 30,
       mortgageRate: 6.75,
       loanTermYears: 30,
-      taxesInsurance: 500,
+      propertyTaxRate: 1.15,
+      annualInsurance: 1800,
       homePrice: 0,
     };
   }
   if (!Array.isArray(state.houseCalc.debts)) state.houseCalc.debts = [];
+  // Migrate older flat taxesInsurance field if present
+  if (state.houseCalc.propertyTaxRate == null) state.houseCalc.propertyTaxRate = 1.15;
+  if (state.houseCalc.annualInsurance == null) state.houseCalc.annualInsurance = 1800;
   return state.houseCalc;
 }
 
@@ -250,7 +255,8 @@ function computeHouseAffordability(hc) {
   const dti = Math.max(0, Math.min(60, Number(hc.dtiPercent) || 0));
   const rate = Math.max(0, Number(hc.mortgageRate) || 0);
   const term = Math.max(1, Number(hc.loanTermYears) || 30);
-  const taxIns = Math.max(0, Number(hc.taxesInsurance) || 0);
+  const propertyTaxRate = Math.max(0, Number(hc.propertyTaxRate) || 0);
+  const annualInsurance = Math.max(0, Number(hc.annualInsurance) || 0);
   const homePrice = Math.max(0, Number(hc.homePrice) || 0);
   const totalDebts = (hc.debts || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
 
@@ -258,6 +264,12 @@ function computeHouseAffordability(hc) {
   const monthlyNet = monthlyGross * (1 - taxRate / 100);
   const monthlyDisp = Math.max(0, monthlyNet - totalDebts);
   const maxHousing = monthlyDisp * (dti / 100);
+
+  // Property tax + insurance scales with home price
+  const monthlyPropertyTax = (homePrice * propertyTaxRate / 100) / 12;
+  const monthlyInsurance = annualInsurance / 12;
+  const taxIns = monthlyPropertyTax + monthlyInsurance;
+
   const maxPI = Math.max(0, maxHousing - taxIns);
 
   const r = (rate / 100) / 12;
@@ -272,7 +284,8 @@ function computeHouseAffordability(hc) {
 
   return {
     monthlyGross, monthlyNet, monthlyDisp, totalDebts,
-    maxHousing, maxPI, maxLoan,
+    maxHousing, maxPI, maxLoan, taxIns,
+    monthlyPropertyTax, monthlyInsurance,
     homePrice, downPayment,
   };
 }
@@ -412,7 +425,8 @@ function renderHouseCalc() {
   $('hcRate').value = hc.mortgageRate ?? '';
   $('hcTerm').value = hc.loanTermYears ?? '';
   $('hcDti').value = hc.dtiPercent ?? '';
-  $('hcTaxIns').value = hc.taxesInsurance ? Number(hc.taxesInsurance).toLocaleString('en-US') : '';
+  $('hcPropTaxRate').value = hc.propertyTaxRate ?? '';
+  $('hcInsurance').value = hc.annualInsurance ? Number(hc.annualInsurance).toLocaleString('en-US') : '';
   $('hcHomePrice').value = hc.homePrice ? Number(hc.homePrice).toLocaleString('en-US') : '';
 
   renderDebts();
@@ -466,7 +480,8 @@ function computeHouse() {
   hc.mortgageRate = parseNum($('hcRate').value);
   hc.loanTermYears = parseNum($('hcTerm').value) || 30;
   hc.dtiPercent = parseNum($('hcDti').value);
-  hc.taxesInsurance = parseNum($('hcTaxIns').value);
+  hc.propertyTaxRate = parseNum($('hcPropTaxRate').value);
+  hc.annualInsurance = parseNum($('hcInsurance').value);
   hc.homePrice = parseNum($('hcHomePrice').value);
 
   const r = computeHouseAffordability(hc);
@@ -474,6 +489,7 @@ function computeHouse() {
   $('statNet').textContent = fmtMoney(r.monthlyNet);
   $('statDisp').textContent = fmtMoney(r.monthlyDisp);
   $('statMaxHousing').textContent = fmtMoney(r.maxHousing) + ' / mo';
+  $('statTaxIns').textContent = fmtMoney(r.taxIns) + ' / mo';
   $('statMaxLoan').textContent = fmtMoney(r.maxLoan);
   $('statDown').textContent = fmtMoney(r.downPayment);
 
@@ -751,7 +767,7 @@ function wireEvents() {
     saveState();
   });
 
-  ['hcIncome', 'hcTaxIns', 'hcHomePrice'].forEach(id => {
+  ['hcIncome', 'hcInsurance', 'hcHomePrice'].forEach(id => {
     const el = $(id);
     el.addEventListener('input', () => {
       const before = el.value;
@@ -767,7 +783,7 @@ function wireEvents() {
       saveState();
     });
   });
-  ['hcTaxRate', 'hcRate', 'hcTerm', 'hcDti'].forEach(id => {
+  ['hcTaxRate', 'hcRate', 'hcTerm', 'hcDti', 'hcPropTaxRate'].forEach(id => {
     $(id).addEventListener('input', () => { computeHouse(); saveState(); });
   });
 

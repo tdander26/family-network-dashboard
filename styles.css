@@ -555,6 +555,16 @@ label > span {
   letter-spacing: 1.4px;
   color: var(--text-mute);
 }
+label > span .hint {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  font-style: normal;
+  letter-spacing: 0.4px;
+  text-transform: none;
+  color: var(--text-mute);
+  opacity: 0.85;
+}
 
 .input-wrap {
   position: relative;

@@ -114,13 +114,20 @@
                   </div>
                 </label>
                 <label>
-                  <span>Tax + Insurance / mo</span>
+                  <span>Annual Insurance</span>
                   <div class="input-wrap">
                     <span class="prefix">$</span>
-                    <input type="text" id="hcTaxIns" inputmode="decimal" placeholder="500" />
+                    <input type="text" id="hcInsurance" inputmode="decimal" placeholder="1,800" />
                   </div>
                 </label>
               </div>
+              <label>
+                <span>Property Tax Rate <em class="hint">Hennepin Co MN avg ~1.15% (Mpls ~1.4%, Edina ~1.0%)</em></span>
+                <div class="input-wrap">
+                  <input type="text" id="hcPropTaxRate" inputmode="decimal" placeholder="1.15" />
+                  <span class="suffix">% / yr</span>
+                </div>
+              </label>
             </div>
 
             <div class="form-section">
@@ -138,6 +145,7 @@
               <div class="stat-row"><div class="stat-label">Monthly Net Income</div><div class="stat-value" id="statNet">$0</div></div>
               <div class="stat-row"><div class="stat-label">Monthly Disposable</div><div class="stat-value" id="statDisp">$0</div></div>
               <div class="stat-row"><div class="stat-label">Max Housing Payment</div><div class="stat-value" id="statMaxHousing">$0</div></div>
+              <div class="stat-row"><div class="stat-label">Property Tax + Insurance</div><div class="stat-value" id="statTaxIns">$0</div></div>
               <div class="stat-row"><div class="stat-label">Max Loan You Qualify For</div><div class="stat-value" id="statMaxLoan">$0</div></div>
               <div class="stat-row big"><div class="stat-label">Down Payment Needed</div><div class="stat-value" id="statDown">$0</div></div>
             </div>
