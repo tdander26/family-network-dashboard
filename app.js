@@ -113,7 +113,21 @@ const seedData = {
     },
   ],
   activeMemberId: 'family',
-  familyGoal: { target: 1000000, monthly: 4500, rate: 7 },
+  familyGoal: { target: 0, monthly: 4500, rate: 7 },
+  houseCalc: {
+    expanded: true,
+    annualIncome: 180000,
+    taxRate: 22,
+    debts: [
+      { id: 'd1', name: 'Car payment', amount: 450 },
+      { id: 'd2', name: 'Student loan', amount: 0 },
+    ],
+    dtiPercent: 30,
+    mortgageRate: 6.75,
+    loanTermYears: 30,
+    taxesInsurance: 500,
+    homePrice: 650000,
+  },
 };
 
 const FAMILY_ID = 'family';
@@ -209,6 +223,58 @@ function activeGoal() {
   const m = activeMember();
   m.goal = m.goal || { target: 0, monthly: 0, rate: 7 };
   return m.goal;
+}
+
+function ensureHouseCalc() {
+  if (!state.houseCalc) {
+    state.houseCalc = {
+      expanded: true,
+      annualIncome: 0,
+      taxRate: 22,
+      debts: [],
+      dtiPercent: 30,
+      mortgageRate: 6.75,
+      loanTermYears: 30,
+      taxesInsurance: 500,
+      homePrice: 0,
+    };
+  }
+  if (!Array.isArray(state.houseCalc.debts)) state.houseCalc.debts = [];
+  return state.houseCalc;
+}
+
+// ===== House affordability math =====
+function computeHouseAffordability(hc) {
+  const annualIncome = Number(hc.annualIncome) || 0;
+  const taxRate = Math.max(0, Math.min(60, Number(hc.taxRate) || 0));
+  const dti = Math.max(0, Math.min(60, Number(hc.dtiPercent) || 0));
+  const rate = Math.max(0, Number(hc.mortgageRate) || 0);
+  const term = Math.max(1, Number(hc.loanTermYears) || 30);
+  const taxIns = Math.max(0, Number(hc.taxesInsurance) || 0);
+  const homePrice = Math.max(0, Number(hc.homePrice) || 0);
+  const totalDebts = (hc.debts || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+
+  const monthlyGross = annualIncome / 12;
+  const monthlyNet = monthlyGross * (1 - taxRate / 100);
+  const monthlyDisp = Math.max(0, monthlyNet - totalDebts);
+  const maxHousing = monthlyDisp * (dti / 100);
+  const maxPI = Math.max(0, maxHousing - taxIns);
+
+  const r = (rate / 100) / 12;
+  const n = term * 12;
+  let maxLoan = 0;
+  if (maxPI > 0) {
+    if (r === 0) maxLoan = maxPI * n;
+    else maxLoan = maxPI * (Math.pow(1 + r, n) - 1) / (r * Math.pow(1 + r, n));
+  }
+
+  const downPayment = Math.max(0, homePrice - maxLoan);
+
+  return {
+    monthlyGross, monthlyNet, monthlyDisp, totalDebts,
+    maxHousing, maxPI, maxLoan,
+    homePrice, downPayment,
+  };
 }
 
 function activeTotal() {
@@ -313,15 +379,124 @@ function renderAccounts() {
 
 function renderGoal() {
   const goal = activeGoal();
-  $('goalAmount').value = goal.target ? Number(goal.target).toLocaleString('en-US') : '';
+  const family = isFamilyView();
+
+  // Show/hide sections based on view
+  $('houseCalc').style.display = family ? '' : 'none';
+  $('simpleGoalForm').style.display = family ? 'none' : '';
+
+  if (family) {
+    $('goalPanelTitle').textContent = 'House Down Payment';
+    $('goalPanelSub').textContent = 'Project your path to the build';
+    $('pathTitle').textContent = 'Path to Down Payment';
+    renderHouseCalc();
+  } else {
+    $('goalPanelTitle').textContent = 'Goal Planner';
+    $('goalPanelSub').textContent = 'Project your path to the target';
+    $('pathTitle').textContent = 'Path to Goal';
+    $('goalAmount').value = goal.target ? Number(goal.target).toLocaleString('en-US') : '';
+  }
+
   $('monthlyAmount').value = goal.monthly ? Number(goal.monthly).toLocaleString('en-US') : '';
   $('returnRate').value = goal.rate || '';
   computeGoal();
 }
 
+function renderHouseCalc() {
+  const hc = ensureHouseCalc();
+  const calc = $('houseCalc');
+  calc.classList.toggle('open', !!hc.expanded);
+
+  $('hcIncome').value = hc.annualIncome ? Number(hc.annualIncome).toLocaleString('en-US') : '';
+  $('hcTaxRate').value = hc.taxRate ?? '';
+  $('hcRate').value = hc.mortgageRate ?? '';
+  $('hcTerm').value = hc.loanTermYears ?? '';
+  $('hcDti').value = hc.dtiPercent ?? '';
+  $('hcTaxIns').value = hc.taxesInsurance ? Number(hc.taxesInsurance).toLocaleString('en-US') : '';
+  $('hcHomePrice').value = hc.homePrice ? Number(hc.homePrice).toLocaleString('en-US') : '';
+
+  renderDebts();
+  computeHouse();
+}
+
+function renderDebts() {
+  const hc = ensureHouseCalc();
+  const list = $('debtsList');
+  list.innerHTML = '';
+  hc.debts.forEach(d => {
+    const row = document.createElement('div');
+    row.className = 'debt-row';
+    row.innerHTML = `
+      <input type="text" class="debt-name" placeholder="Car payment" />
+      <div class="input-wrap">
+        <span class="prefix">$</span>
+        <input type="text" class="debt-amount" inputmode="decimal" placeholder="0" />
+      </div>
+      <button type="button" class="debt-del" title="Remove">×</button>
+    `;
+    const nameEl = row.querySelector('.debt-name');
+    const amtEl = row.querySelector('.debt-amount');
+    nameEl.value = d.name || '';
+    amtEl.value = d.amount ? Number(d.amount).toLocaleString('en-US') : '';
+    nameEl.addEventListener('input', () => { d.name = nameEl.value; saveState(); });
+    amtEl.addEventListener('input', () => {
+      d.amount = parseNum(amtEl.value);
+      computeHouse();
+      saveState();
+    });
+    amtEl.addEventListener('blur', () => {
+      const n = parseNum(amtEl.value);
+      amtEl.value = n ? n.toLocaleString('en-US') : '';
+    });
+    row.querySelector('.debt-del').addEventListener('click', () => {
+      hc.debts = hc.debts.filter(x => x.id !== d.id);
+      saveState();
+      renderDebts();
+      computeHouse();
+    });
+    list.appendChild(row);
+  });
+}
+
+function computeHouse() {
+  const hc = ensureHouseCalc();
+  // Pull current input values
+  hc.annualIncome = parseNum($('hcIncome').value);
+  hc.taxRate = parseNum($('hcTaxRate').value);
+  hc.mortgageRate = parseNum($('hcRate').value);
+  hc.loanTermYears = parseNum($('hcTerm').value) || 30;
+  hc.dtiPercent = parseNum($('hcDti').value);
+  hc.taxesInsurance = parseNum($('hcTaxIns').value);
+  hc.homePrice = parseNum($('hcHomePrice').value);
+
+  const r = computeHouseAffordability(hc);
+
+  $('statNet').textContent = fmtMoney(r.monthlyNet);
+  $('statDisp').textContent = fmtMoney(r.monthlyDisp);
+  $('statMaxHousing').textContent = fmtMoney(r.maxHousing) + ' / mo';
+  $('statMaxLoan').textContent = fmtMoney(r.maxLoan);
+  $('statDown').textContent = fmtMoney(r.downPayment);
+
+  // Summary in collapsed header
+  $('houseSummary').textContent = r.downPayment > 0
+    ? 'Down: ' + fmtMoneyShort(r.downPayment)
+    : '—';
+
+  // Feed the down payment into the family goal target
+  if (isFamilyView()) {
+    state.familyGoal = state.familyGoal || { target: 0, monthly: 0, rate: 7 };
+    state.familyGoal.target = r.downPayment;
+    computeGoal();
+  }
+}
+
 function computeGoal() {
   const current = activeTotal();
-  const target = parseNum($('goalAmount').value);
+  const family = isFamilyView();
+  // In family view, target comes from the house calc (already on state.familyGoal.target)
+  const target = family
+    ? (state.familyGoal?.target || 0)
+    : parseNum($('goalAmount').value);
   const monthly = parseNum($('monthlyAmount').value);
   const annualRate = parseNum($('returnRate').value);
   const remaining = Math.max(0, target - current);
@@ -330,8 +505,11 @@ function computeGoal() {
   $('resRemaining').textContent = fmtMoney(remaining);
 
   // Save goal inputs
-  if (isFamilyView()) {
-    state.familyGoal = { target, monthly, rate: annualRate };
+  if (family) {
+    state.familyGoal = state.familyGoal || { target: 0, monthly: 0, rate: 7 };
+    state.familyGoal.monthly = monthly;
+    state.familyGoal.rate = annualRate;
+    // target stays driven by the house calc
   } else {
     activeMember().goal = { target, monthly, rate: annualRate };
   }
@@ -564,6 +742,42 @@ function wireEvents() {
     });
   });
   $('returnRate').addEventListener('input', computeGoal);
+
+  // House calc inputs
+  $('houseToggle').addEventListener('click', () => {
+    const hc = ensureHouseCalc();
+    hc.expanded = !hc.expanded;
+    $('houseCalc').classList.toggle('open', hc.expanded);
+    saveState();
+  });
+
+  ['hcIncome', 'hcTaxIns', 'hcHomePrice'].forEach(id => {
+    const el = $(id);
+    el.addEventListener('input', () => {
+      const before = el.value;
+      const n = parseNum(before);
+      const formatted = n ? n.toLocaleString('en-US') : '';
+      if (formatted !== before && before !== '') {
+        const cursor = el.selectionStart;
+        el.value = formatted;
+        const diff = formatted.length - before.length;
+        el.setSelectionRange(Math.max(0, (cursor || 0) + diff), Math.max(0, (cursor || 0) + diff));
+      }
+      computeHouse();
+      saveState();
+    });
+  });
+  ['hcTaxRate', 'hcRate', 'hcTerm', 'hcDti'].forEach(id => {
+    $(id).addEventListener('input', () => { computeHouse(); saveState(); });
+  });
+
+  $('addDebtBtn').addEventListener('click', () => {
+    const hc = ensureHouseCalc();
+    hc.debts.push({ id: 'd' + Date.now().toString(36), name: '', amount: 0 });
+    saveState();
+    renderDebts();
+    computeHouse();
+  });
 
   // Balance input formatting
   $('acctBalance').addEventListener('blur', () => {

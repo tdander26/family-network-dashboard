@@ -50,11 +50,102 @@
 
       <div class="panel goal-panel">
         <div class="panel-head">
-          <h2>Goal Planner</h2>
-          <div class="panel-sub">Project your path to the target</div>
+          <h2 id="goalPanelTitle">Goal Planner</h2>
+          <div class="panel-sub" id="goalPanelSub">Project your path to the target</div>
         </div>
 
-        <div class="goal-form">
+        <!-- House Affordability (Family view only) -->
+        <div class="house-calc" id="houseCalc">
+          <button type="button" class="collapse-head" id="houseToggle">
+            <span class="chev">›</span>
+            <span class="collapse-title">House Affordability</span>
+            <span class="collapse-meta" id="houseSummary">—</span>
+          </button>
+
+          <div class="collapse-body" id="houseBody">
+            <div class="form-section">
+              <div class="form-section-title">Income</div>
+              <label>
+                <span>Annual Household Income</span>
+                <div class="input-wrap">
+                  <span class="prefix">$</span>
+                  <input type="text" id="hcIncome" inputmode="decimal" placeholder="180,000" />
+                </div>
+              </label>
+              <label>
+                <span>Effective Tax Rate</span>
+                <div class="input-wrap">
+                  <input type="text" id="hcTaxRate" inputmode="decimal" placeholder="22" />
+                  <span class="suffix">%</span>
+                </div>
+              </label>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Monthly Obligations</div>
+              <div class="debts-list" id="debtsList"></div>
+              <button type="button" class="add-debt-btn" id="addDebtBtn">+ Add obligation</button>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Mortgage Terms</div>
+              <div class="form-row">
+                <label>
+                  <span>Interest Rate</span>
+                  <div class="input-wrap">
+                    <input type="text" id="hcRate" inputmode="decimal" placeholder="6.75" />
+                    <span class="suffix">%</span>
+                  </div>
+                </label>
+                <label>
+                  <span>Loan Term</span>
+                  <div class="input-wrap">
+                    <input type="text" id="hcTerm" inputmode="decimal" placeholder="30" />
+                    <span class="suffix">yr</span>
+                  </div>
+                </label>
+              </div>
+              <div class="form-row">
+                <label>
+                  <span>Max Housing % of Disposable</span>
+                  <div class="input-wrap">
+                    <input type="text" id="hcDti" inputmode="decimal" placeholder="30" />
+                    <span class="suffix">%</span>
+                  </div>
+                </label>
+                <label>
+                  <span>Tax + Insurance / mo</span>
+                  <div class="input-wrap">
+                    <span class="prefix">$</span>
+                    <input type="text" id="hcTaxIns" inputmode="decimal" placeholder="500" />
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="form-section-title">Target Home</div>
+              <label>
+                <span>Target Home Price</span>
+                <div class="input-wrap">
+                  <span class="prefix">$</span>
+                  <input type="text" id="hcHomePrice" inputmode="decimal" placeholder="650,000" />
+                </div>
+              </label>
+            </div>
+
+            <div class="house-stats">
+              <div class="stat-row"><div class="stat-label">Monthly Net Income</div><div class="stat-value" id="statNet">$0</div></div>
+              <div class="stat-row"><div class="stat-label">Monthly Disposable</div><div class="stat-value" id="statDisp">$0</div></div>
+              <div class="stat-row"><div class="stat-label">Max Housing Payment</div><div class="stat-value" id="statMaxHousing">$0</div></div>
+              <div class="stat-row"><div class="stat-label">Max Loan You Qualify For</div><div class="stat-value" id="statMaxLoan">$0</div></div>
+              <div class="stat-row big"><div class="stat-label">Down Payment Needed</div><div class="stat-value" id="statDown">$0</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Simple goal target (member view only) -->
+        <div class="goal-form" id="simpleGoalForm">
           <label>
             <span>Target Amount</span>
             <div class="input-wrap">
@@ -62,7 +153,10 @@
               <input type="text" id="goalAmount" inputmode="decimal" placeholder="250,000" />
             </div>
           </label>
+        </div>
 
+        <div class="form-section">
+          <div class="form-section-title" id="pathTitle">Path to Goal</div>
           <label>
             <span>Monthly Contribution</span>
             <div class="input-wrap">
@@ -70,7 +164,6 @@
               <input type="text" id="monthlyAmount" inputmode="decimal" placeholder="2,000" />
             </div>
           </label>
-
           <label>
             <span>Expected Annual Return</span>
             <div class="input-wrap">
