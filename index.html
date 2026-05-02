@@ -64,8 +64,11 @@
           </button>
 
           <div class="collapse-body" id="houseBody">
-            <div class="form-section">
-              <div class="form-section-title">Income</div>
+            <div class="form-section" data-section="income">
+              <div class="form-section-title">
+                <span>Income</span>
+                <button type="button" class="lock-btn" data-lock="income" title="Lock section">🔓</button>
+              </div>
               <label>
                 <span>Annual Household Income</span>
                 <div class="input-wrap">
@@ -82,14 +85,20 @@
               </label>
             </div>
 
-            <div class="form-section">
-              <div class="form-section-title">Monthly Obligations</div>
+            <div class="form-section" data-section="obligations">
+              <div class="form-section-title">
+                <span>Monthly Obligations</span>
+                <button type="button" class="lock-btn" data-lock="obligations" title="Lock section">🔓</button>
+              </div>
               <div class="debts-list" id="debtsList"></div>
               <button type="button" class="add-debt-btn" id="addDebtBtn">+ Add obligation</button>
             </div>
 
-            <div class="form-section">
-              <div class="form-section-title">Mortgage Terms</div>
+            <div class="form-section" data-section="mortgage">
+              <div class="form-section-title">
+                <span>Mortgage Terms</span>
+                <button type="button" class="lock-btn" data-lock="mortgage" title="Lock section">🔓</button>
+              </div>
               <div class="form-row">
                 <label>
                   <span>Interest Rate</span>
@@ -131,15 +140,27 @@
               </label>
             </div>
 
-            <div class="form-section">
-              <div class="form-section-title">Target Home</div>
-              <label>
-                <span>Target Home Price</span>
-                <div class="input-wrap">
-                  <span class="prefix">$</span>
-                  <input type="text" id="hcHomePrice" inputmode="decimal" placeholder="650,000" />
-                </div>
-              </label>
+            <div class="form-section" data-section="target">
+              <div class="form-section-title">
+                <span>Target Home</span>
+                <button type="button" class="lock-btn" data-lock="target" title="Lock section">🔓</button>
+              </div>
+              <div class="form-row">
+                <label>
+                  <span>Target Home Price <em class="hint">Total project value (build + land)</em></span>
+                  <div class="input-wrap">
+                    <span class="prefix">$</span>
+                    <input type="text" id="hcHomePrice" inputmode="decimal" placeholder="650,000" />
+                  </div>
+                </label>
+                <label>
+                  <span>Land Value (Owned) <em class="hint">Counted as collateral / equity</em></span>
+                  <div class="input-wrap">
+                    <span class="prefix">$</span>
+                    <input type="text" id="hcLandValue" inputmode="decimal" placeholder="0" />
+                  </div>
+                </label>
+              </div>
             </div>
 
             <div class="house-stats">
@@ -148,6 +169,8 @@
               <div class="stat-row"><div class="stat-label">Max Housing Payment</div><div class="stat-value" id="statMaxHousing">$0</div></div>
               <div class="stat-row"><div class="stat-label">Property Tax + Insurance</div><div class="stat-value" id="statTaxIns">$0</div></div>
               <div class="stat-row"><div class="stat-label">Max Loan You Qualify For</div><div class="stat-value" id="statMaxLoan">$0</div></div>
+              <div class="stat-row"><div class="stat-label">Land Equity Applied</div><div class="stat-value" id="statLandEq">$0</div></div>
+              <div class="stat-row"><div class="stat-label">Loan-to-Value (LTV)</div><div class="stat-value" id="statLtv">—</div></div>
               <div class="stat-row big"><div class="stat-label">Down Payment Needed</div><div class="stat-value" id="statDown">$0</div></div>
             </div>
           </div>

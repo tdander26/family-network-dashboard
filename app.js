@@ -129,6 +129,8 @@ const seedData = {
     propertyTaxRate: 1.15, // Hennepin County MN avg
     annualInsurance: 1800,
     homePrice: 650000,
+    landValue: 0,
+    locked: { income: false, obligations: false, mortgage: false, target: false },
   },
 };
 
@@ -246,6 +248,8 @@ function ensureHouseCalc() {
   // Migrate older flat taxesInsurance field if present
   if (state.houseCalc.propertyTaxRate == null) state.houseCalc.propertyTaxRate = 1.15;
   if (state.houseCalc.annualInsurance == null) state.houseCalc.annualInsurance = 1800;
+  if (state.houseCalc.landValue == null) state.houseCalc.landValue = 0;
+  if (!state.houseCalc.locked) state.houseCalc.locked = { income: false, obligations: false, mortgage: false, target: false };
   return state.houseCalc;
 }
 
@@ -259,6 +263,7 @@ function computeHouseAffordability(hc) {
   const propertyTaxRate = Math.max(0, Number(hc.propertyTaxRate) || 0);
   const annualInsurance = Math.max(0, Number(hc.annualInsurance) || 0);
   const homePrice = Math.max(0, Number(hc.homePrice) || 0);
+  const landValue = Math.max(0, Number(hc.landValue) || 0);
   const totalDebts = (hc.debts || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
 
   const monthlyGross = annualIncome / 12;
@@ -281,13 +286,20 @@ function computeHouseAffordability(hc) {
     else maxLoan = maxPI * (Math.pow(1 + r, n) - 1) / (r * Math.pow(1 + r, n));
   }
 
-  const downPayment = Math.max(0, homePrice - maxLoan);
+  // Land value counts as equity / collateral, reducing cash needed at close.
+  const landEquityApplied = Math.min(landValue, Math.max(0, homePrice - maxLoan));
+  const downPayment = Math.max(0, homePrice - maxLoan - landValue);
+  // LTV uses total project value (home + owned land) as the collateral base.
+  const collateralBase = homePrice + landValue;
+  const ltv = collateralBase > 0 ? (maxLoan / collateralBase) * 100 : 0;
 
   return {
     monthlyGross, monthlyNet, monthlyDisp, totalDebts,
     maxHousing, maxPI, maxLoan, taxIns,
     monthlyPropertyTax, monthlyInsurance,
-    homePrice, downPayment,
+    homePrice, landValue, landEquityApplied,
+    collateralBase, ltv,
+    downPayment,
   };
 }
 
@@ -502,6 +514,9 @@ function renderHouseCalc() {
   $('hcPropTaxRate').value = hc.propertyTaxRate ?? '';
   $('hcInsurance').value = hc.annualInsurance ? Number(hc.annualInsurance).toLocaleString('en-US') : '';
   $('hcHomePrice').value = hc.homePrice ? Number(hc.homePrice).toLocaleString('en-US') : '';
+  $('hcLandValue').value = hc.landValue ? Number(hc.landValue).toLocaleString('en-US') : '';
+
+  applyLockUI();
 
   renderDebts();
   computeHouse();
@@ -557,6 +572,7 @@ function computeHouse() {
   hc.propertyTaxRate = parseNum($('hcPropTaxRate').value);
   hc.annualInsurance = parseNum($('hcInsurance').value);
   hc.homePrice = parseNum($('hcHomePrice').value);
+  hc.landValue = parseNum($('hcLandValue').value);
 
   const r = computeHouseAffordability(hc);
 
@@ -565,6 +581,8 @@ function computeHouse() {
   $('statMaxHousing').textContent = fmtMoney(r.maxHousing) + ' / mo';
   $('statTaxIns').textContent = fmtMoney(r.taxIns) + ' / mo';
   $('statMaxLoan').textContent = fmtMoney(r.maxLoan);
+  $('statLandEq').textContent = fmtMoney(r.landEquityApplied);
+  $('statLtv').textContent = r.collateralBase > 0 ? r.ltv.toFixed(1) + '%' : '—';
   $('statDown').textContent = fmtMoney(r.downPayment);
 
   // Summary in collapsed header
@@ -839,6 +857,22 @@ function drawChart(svg, series) {
   });
 }
 
+function applyLockUI() {
+  const hc = ensureHouseCalc();
+  const locked = hc.locked || {};
+  document.querySelectorAll('.form-section[data-section]').forEach(sec => {
+    const key = sec.getAttribute('data-section');
+    const isLocked = !!locked[key];
+    sec.classList.toggle('locked', isLocked);
+    sec.querySelectorAll('input').forEach(i => { i.disabled = isLocked; });
+    const btn = sec.querySelector('.lock-btn');
+    if (btn) {
+      btn.textContent = isLocked ? '🔒' : '🔓';
+      btn.title = isLocked ? 'Unlock section' : 'Lock section';
+    }
+  });
+}
+
 function fmtAxisCurrency(n) {
   const abs = Math.abs(n);
   if (abs >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
@@ -1021,7 +1055,7 @@ function wireEvents() {
     saveState();
   });
 
-  ['hcIncome', 'hcInsurance', 'hcHomePrice'].forEach(id => {
+  ['hcIncome', 'hcInsurance', 'hcHomePrice', 'hcLandValue'].forEach(id => {
     const el = $(id);
     el.addEventListener('input', () => {
       const before = el.value;
@@ -1043,10 +1077,23 @@ function wireEvents() {
 
   $('addDebtBtn').addEventListener('click', () => {
     const hc = ensureHouseCalc();
+    if (hc.locked?.obligations) return;
     hc.debts.push({ id: 'd' + Date.now().toString(36), name: '', amount: 0 });
     saveState();
     renderDebts();
     computeHouse();
+  });
+
+  // Section locks
+  document.querySelectorAll('.lock-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.getAttribute('data-lock');
+      const hc = ensureHouseCalc();
+      hc.locked = hc.locked || {};
+      hc.locked[key] = !hc.locked[key];
+      applyLockUI();
+      saveState();
+    });
   });
 
   // Balance input formatting

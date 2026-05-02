@@ -410,15 +410,37 @@ main {
 .form-section-title {
   font-family: 'Fraunces', serif;
   font-weight: 400;
-  font-size: 13px;
-  letter-spacing: 0.4px;
+  font-size: 11px;
+  letter-spacing: 1.6px;
   color: var(--accent);
   padding-bottom: 6px;
   border-bottom: 1px solid var(--line);
   text-transform: uppercase;
-  letter-spacing: 1.6px;
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
+.lock-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-mute);
+  width: 26px; height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.16s ease;
+  opacity: 0.6;
+}
+.lock-btn:hover { opacity: 1; color: var(--accent); border-color: rgba(200, 169, 106, 0.25); }
+.form-section.locked .lock-btn { opacity: 1; color: var(--accent); }
+.form-section.locked input,
+.form-section.locked .add-debt-btn,
+.form-section.locked .debt-del { pointer-events: none; opacity: 0.55; }
+.form-section.locked input { background: rgba(10, 13, 18, 0.3); border-color: rgba(255,255,255,0.04); }
+.form-section.locked .add-debt-btn { display: none; }
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
